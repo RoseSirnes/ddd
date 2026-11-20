@@ -20,7 +20,7 @@ jobs:
         run: go test ./...
       - name: Extrair versão e conferir configuração oficial
         env:
-          DDD_SERVER_URL: ${{ vars.DDD_SERVER_URL }}
+          DDD_SERVER_URL: ${{ vars.DDD_SERVER_URL || 'https://ddd-chat-production.up.railway.app' }}
           DDD_SIGNING_KEY: ${{ secrets.DDD_SIGNING_KEY }}
         run: |
           set -euo pipefail
@@ -41,7 +41,7 @@ jobs:
       - name: Gerar DDD Windows com servidor e atualizador pré-configurados
         if: env.DDD_ALREADY_RELEASED != 'yes'
         env:
-          DDD_SERVER_URL: ${{ vars.DDD_SERVER_URL }}
+          DDD_SERVER_URL: ${{ vars.DDD_SERVER_URL || 'https://ddd-chat-production.up.railway.app' }}
         run: |
           GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build \
             -ldflags="-H=windowsgui -s -w -X main.defaultCentralURL=${DDD_SERVER_URL} -X main.defaultUpdateRepo=${GITHUB_REPOSITORY}" \
