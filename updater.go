@@ -20,7 +20,7 @@ import (
 	"time"
 )
 
-const appVersion = "1.5.0"
+const appVersion = "1.6.0"
 
 // Valores definidos somente pela publicação oficial. O usuário não os configura.
 var defaultUpdateRepo string

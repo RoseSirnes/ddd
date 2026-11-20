@@ -48,15 +48,39 @@
         <form id="auth-form" autocomplete="on">
           <label for="auth-nick">Seu nick</label>
           <div class="input-wrap"><span class="input-prepend">@</span><input id="auth-nick" name="nickname" autocomplete="username" placeholder="seu_nick" minlength="3" maxlength="20" required pattern="[a-zA-Z0-9_.]{3,20}" /></div>
+          <div id="register-email-field" class="hidden">
+            <label for="auth-email">E-mail para recuperar a conta</label>
+            <div class="input-wrap"><span class="input-prepend">@</span><input id="auth-email" name="email" type="email" autocomplete="email" placeholder="voce@exemplo.com" maxlength="254" /></div>
+            <p class="form-hint">Vamos enviar um código para confirmar esse endereço. Seu e-mail não aparece para outras pessoas.</p>
+          </div>
           <label for="auth-password">Sua senha</label>
           <div class="input-wrap"><svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><input id="auth-password" name="password" type="password" autocomplete="current-password" placeholder="••••••••" minlength="8" maxlength="128" required /><button id="toggle-password" class="input-tail" type="button" aria-label="Mostrar senha" title="Mostrar senha">◉</button></div>
           <p id="register-help" class="form-hint hidden">Nick: 3–20 caracteres, com letras, números, ponto ou _. Use uma senha de pelo menos 8 caracteres.</p>
           <p id="auth-error" class="auth-error hidden" role="alert"></p>
           <button id="auth-submit" class="primary-button auth-submit" type="submit">Entrar no DDD <span aria-hidden="true">↗</span></button>
         </form>
-        <p class="auth-note">Sem e-mail nesta versão. Guarde sua senha: ainda não existe recuperação de acesso.</p>
+        <button id="forgot-password" type="button" class="auth-link">Esqueci minha senha</button>
+        <div id="recovery-panel" class="hidden">
+          <form id="recovery-request-form" class="auth-extra-form">
+            <label for="recovery-email">Seu e-mail confirmado no DDD</label>
+            <input type="email" id="recovery-email" autocomplete="email" maxlength="254" placeholder="voce@exemplo.com" required />
+            <button type="submit" class="primary-button">Enviar código de recuperação</button>
+          </form>
+          <form id="recovery-confirm-form" class="auth-extra-form hidden">
+            <p class="form-hint">Confira o código no e-mail. Se não chegar, veja a pasta de spam.</p>
+            <label for="recovery-code">Código recebido por e-mail</label>
+            <input id="recovery-code" autocomplete="one-time-code" placeholder="XXXX-XXXX-XXXX-XXXX" required minlength="16" maxlength="19" />
+            <label for="recovery-password">Nova senha</label>
+            <input id="recovery-password" type="password" autocomplete="new-password" placeholder="No mínimo 8 caracteres" minlength="8" maxlength="128" required />
+            <button type="submit" class="primary-button">Redefinir minha senha</button>
+            <button type="button" class="auth-link" id="recovery-restart">Solicitar outro código</button>
+          </form>
+          <p id="recovery-message" class="form-hint" role="status"></p>
+          <button type="button" class="auth-link" id="recovery-back">← Voltar para entrar</button>
+        </div>
+        <p class="auth-note">Guarde sua senha. A recuperação usa um e-mail confirmado na sua conta.</p>
       </div>
-      <div class="auth-smallprint">Feito para boas conversas <span>✳</span> Versão 1.5</div>
+      <div class="auth-smallprint">Feito para boas conversas <span>✳</span> Versão 1.6</div>
     </div>
   </section>
 

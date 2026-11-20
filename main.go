@@ -34,6 +34,9 @@ type User struct {
 	ID            string `json:"id"`
 	Nickname      string `json:"nickname"`
 	PasswordHash  string `json:"passwordHash"`
+	Email         string `json:"email,omitempty"`
+	EmailVerified bool   `json:"emailVerified"`
+	PendingEmail  string `json:"pendingEmail,omitempty"`
 	AvatarImageID string `json:"avatarImageId"`
 	Bio           string `json:"bio"`
 	Status        string `json:"status"`
@@ -68,12 +71,13 @@ type Image struct {
 	CreatedAt int64  `json:"createdAt"`
 }
 type Data struct {
-	Users    map[string]User          `json:"users"`
-	Sessions map[string]Session       `json:"sessions"`
-	Friends  map[string]int64         `json:"friends"`
-	Requests map[string]FriendRequest `json:"requests"`
-	Messages []Message                `json:"messages"`
-	Images   map[string]Image         `json:"images"`
+	Users           map[string]User           `json:"users"`
+	Sessions        map[string]Session        `json:"sessions"`
+	Friends         map[string]int64          `json:"friends"`
+	Requests        map[string]FriendRequest  `json:"requests"`
+	Messages        []Message                 `json:"messages"`
+	Images          map[string]Image          `json:"images"`
+	EmailChallenges map[string]EmailChallenge `json:"emailChallenges,omitempty"`
 }
 type Event struct {
 	Kind string
@@ -87,6 +91,7 @@ type App struct {
 	publicServer bool
 	subscribers  map[string]map[chan Event]bool
 	rate         map[string][]time.Time
+	emailSender  mailSender
 }
 
 func newApp(dir string) (*App, error) {
@@ -94,7 +99,7 @@ func newApp(dir string) (*App, error) {
 		return nil, err
 	}
 	a := &App{dataFile: filepath.Join(dir, "ddd-data.json"), dataDir: dir, subscribers: map[string]map[chan Event]bool{}, rate: map[string][]time.Time{}}
-	a.db = Data{Users: map[string]User{}, Sessions: map[string]Session{}, Friends: map[string]int64{}, Requests: map[string]FriendRequest{}, Messages: []Message{}, Images: map[string]Image{}}
+	a.db = Data{Users: map[string]User{}, Sessions: map[string]Session{}, Friends: map[string]int64{}, Requests: map[string]FriendRequest{}, Messages: []Message{}, Images: map[string]Image{}, EmailChallenges: map[string]EmailChallenge{}}
 	raw, err := os.ReadFile(a.dataFile)
 	if err == nil {
 		if err = json.Unmarshal(raw, &a.db); err != nil {
@@ -118,6 +123,10 @@ func newApp(dir string) (*App, error) {
 	if a.db.Images == nil {
 		a.db.Images = map[string]Image{}
 	}
+	if a.db.EmailChallenges == nil {
+		a.db.EmailChallenges = map[string]EmailChallenge{}
+	}
+	a.emailSender = productionMailerFromEnv()
 	return a, nil
 }
 func (a *App) save() error {
@@ -380,9 +389,12 @@ func (a *App) routes(w http.ResponseWriter, r *http.Request) {
 		a.mu.Unlock()
 		var v any
 		if ok {
-			v = publicUser(u)
+			v = privateUser(u)
 		}
 		jsonRes(w, 200, map[string]any{"user": v, "onlineCount": cnt})
+		return
+	}
+	if a.handlePublicEmailRoutes(w, r) {
 		return
 	}
 	if p == "/api/auth/register" && r.Method == "POST" {
@@ -396,6 +408,7 @@ func (a *App) routes(w http.ResponseWriter, r *http.Request) {
 		var req struct {
 			Nickname string `json:"nickname"`
 			Password string `json:"password"`
+			Email    string `json:"email"`
 		}
 		if !readJSON(w, r, &req) {
 			return
@@ -406,6 +419,12 @@ func (a *App) routes(w http.ResponseWriter, r *http.Request) {
 		}
 		if len(req.Password) < 8 || len(req.Password) > 128 {
 			apiErr(w, 400, "A senha deve ter entre 8 e 128 caracteres.")
+			return
+		}
+		var emailErr error
+		req.Email, emailErr = normalizedEmail(req.Email)
+		if emailErr != nil {
+			apiErr(w, 400, "Informe um e-mail válido para recuperar a conta.")
 			return
 		}
 		a.mu.Lock()
@@ -419,24 +438,47 @@ func (a *App) routes(w http.ResponseWriter, r *http.Request) {
 		a.mu.Unlock()
 		hash := hashPassword(req.Password)
 		a.mu.Lock()
-		defer a.mu.Unlock()
 		for _, u := range a.db.Users {
 			if strings.EqualFold(u.Nickname, req.Nickname) {
+				a.mu.Unlock()
 				apiErr(w, 409, "Este nick já está em uso.")
 				return
 			}
 		}
+		if a.emailInUseLocked(req.Email, "") {
+			a.mu.Unlock()
+			apiErr(w, 409, "Esse e-mail já está cadastrado.")
+			return
+		}
 		id := uid()
-		u := User{ID: id, Nickname: req.Nickname, PasswordHash: hash, CreatedAt: now()}
+		u := User{ID: id, Nickname: req.Nickname, PasswordHash: hash, Email: req.Email, CreatedAt: now()}
 		a.db.Users[id] = u
 		token := a.newSession(id)
 		if err := a.save(); err != nil {
+			delete(a.db.Users, id)
+			delete(a.db.Sessions, sha(token))
+			a.mu.Unlock()
 			log.Print(err)
 			apiErr(w, 500, "Não foi possível salvar a conta.")
 			return
 		}
+		// A conta pode ser criada mesmo enquanto o provedor de e-mail é configurado.
+		// A recuperação só funcionará após confirmação do endereço.
+		code, canSend := "", a.emailSender != nil
+		if canSend {
+			code = a.issueChallengeLocked(u.ID, u.Email, "verify")
+			if err := a.save(); err != nil {
+				delete(a.db.EmailChallenges, challengeKey(u.ID, "verify"))
+				canSend = false
+			}
+		}
+		a.mu.Unlock()
+		verificationSent := canSend && a.sendSecurityEmail(r.Context(), u.Email, "verify", code) == nil
+		if canSend && !verificationSent {
+			a.dropChallenge(u.ID, "verify", code)
+		}
 		setCookie(w, token, 30*86400, a.publicServer)
-		jsonRes(w, 201, map[string]any{"user": publicUser(u)})
+		jsonRes(w, 201, map[string]any{"user": privateUser(u), "verificationSent": verificationSent})
 		return
 	}
 	if p == "/api/auth/login" && r.Method == "POST" {
@@ -474,7 +516,7 @@ func (a *App) routes(w http.ResponseWriter, r *http.Request) {
 		}
 		a.mu.Unlock()
 		setCookie(w, token, 30*86400, a.publicServer)
-		jsonRes(w, 200, map[string]any{"user": publicUser(match)})
+		jsonRes(w, 200, map[string]any{"user": privateUser(match)})
 		return
 	}
 	if p == "/api/auth/logout" && r.Method == "POST" {
@@ -491,6 +533,9 @@ func (a *App) routes(w http.ResponseWriter, r *http.Request) {
 	u, ok := a.session(r)
 	if !ok {
 		apiErr(w, 401, "Você precisa entrar na sua conta.")
+		return
+	}
+	if a.handleAccountEmailRoutes(w, r, u) {
 		return
 	}
 	// A configuração da fonte de atualizações só é acessível pelo aplicativo local.

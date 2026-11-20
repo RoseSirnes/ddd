@@ -48,6 +48,8 @@ function showAuth() {
   $('#blocking-update-screen').classList.add('hidden');
   $('#loading-screen').classList.add('hidden');$('#app-screen').classList.add('hidden');$('#auth-screen').classList.remove('hidden');
   $('#auth-error').classList.add('hidden');$('#auth-password').value='';
+  $('#recovery-panel').classList.add('hidden');$('#auth-form').classList.remove('hidden');
+  $('#forgot-password').classList.remove('hidden');$('.auth-tabs').classList.remove('hidden');
 }
 
 function clearProfileAvatarSelection(){
@@ -73,11 +75,48 @@ function selectAuthMode(mode) {
   $('#auth-description').textContent=register?'Escolha um nick, crie sua senha e encontre sua galera.':'Entre na sua conta e continue de onde parou.';
   $('#auth-submit').innerHTML=`${register?'Criar minha conta':'Entrar no DDD'} <span aria-hidden="true">↗</span>`;
   $('#register-help').classList.toggle('hidden',!register);
+  $('#register-email-field').classList.toggle('hidden',!register);
+  $('#auth-email').required=register;
+  $('#forgot-password').classList.toggle('hidden',register);
+  $('#recovery-panel').classList.add('hidden');$('#auth-form').classList.remove('hidden');$('.auth-tabs').classList.remove('hidden');
   $('#auth-password').autocomplete=register?'new-password':'current-password';
   $('#auth-error').classList.add('hidden');
   for(const [tab,name] of [['#tab-login','login'],['#tab-register','register']]){
     $(tab).classList.toggle('selected',mode===name);$(tab).setAttribute('aria-selected',String(mode===name));
   }
+}
+function showRecovery(){
+  $('.auth-tabs').classList.add('hidden');
+  $('#auth-form').classList.add('hidden');
+  $('#forgot-password').classList.add('hidden');
+  $('#recovery-panel').classList.remove('hidden');
+  $('#recovery-message').textContent='';
+  $('#auth-title').textContent='Recuperar minha conta';
+  $('#auth-description').textContent='Vamos enviar um código para o e-mail confirmado da sua conta.';
+  $('#recovery-email').value=$('#auth-email').value || '';
+  $('#recovery-request-form').classList.remove('hidden');
+  $('#recovery-confirm-form').classList.add('hidden');
+}
+function emailSectionHTML(){
+  const u=state.me||{};
+  const current=u.email?escapeHTML(u.email):'Nenhum e-mail cadastrado';
+  const pending=u.pendingEmail?`<p class="mail-note">Verificação pendente para: ${escapeHTML(u.pendingEmail)}</p>`:'';
+  const status=u.emailVerified?'<span class="email-status verified">✓ Confirmado para recuperação</span>':'<span class="email-status unverified">⚠ Ainda não confirmado</span>';
+  return `<section class="profile-email-settings"><h4>✉ E-mail e recuperação de conta</h4><p class="mail-note">${current}</p>${u.email?status:''}${pending}
+    <form id="profile-email-request" class="profile-details-form">
+      <label for="profile-email-address">${u.email?'Alterar ou confirmar e-mail':'Adicionar e-mail de recuperação'}</label>
+      <input type="email" id="profile-email-address" placeholder="voce@exemplo.com" maxlength="254" value="${escapeHTML(u.pendingEmail||u.email||'')}" required />
+      <label for="profile-email-password">Senha atual (segurança)</label>
+      <input type="password" id="profile-email-password" autocomplete="current-password" minlength="8" maxlength="128" required placeholder="Digite sua senha atual" />
+      <button class="primary-button" type="submit">Enviar código para o e-mail</button>
+    </form>
+    <form id="profile-email-confirm" class="profile-details-form">
+      <label for="profile-email-code">Código recebido por e-mail</label>
+      <input id="profile-email-code" autocomplete="one-time-code" placeholder="XXXX-XXXX-XXXX-XXXX" required maxlength="19" minlength="16" />
+      <button class="primary-button" type="submit">Confirmar e-mail</button>
+    </form>
+    <p class="mail-note">Somente e-mails confirmados podem recuperar a senha. O e-mail não fica visível no seu perfil público.</p>
+  </section>`;
 }
 function setAuthError(text) {const err=$('#auth-error');err.textContent=text;err.classList.remove('hidden');}
 async function initApp() {
@@ -286,7 +325,7 @@ async function openProfile(id){
     const action=isSelf?'':friend?actionButton('Enviar mensagem','dm',id,'positive'):incoming?'Esta pessoa já enviou um pedido. Veja em Amizades.':outgoing?'Pedido de amizade enviado ✓':actionButton('+ Enviar pedido de amizade','add',id);
     const bio=person.bio?escapeHTML(person.bio):isSelf?'Escreva algo sobre você.':'Nenhuma bio ainda.';
     const status=person.status?escapeHTML(person.status):isSelf?'Defina como você está hoje.':'Sem status definido';
-    $('#profile-content').innerHTML=`<div class="profile-main">${avatarHtml(name,{large:true,imageId:person.avatarImageId})}<h3>@${escapeHTML(name)}</h3><div class="profile-info"><strong>Status</strong><p class="profile-status">${status}</p><strong>Sobre mim</strong><p class="profile-bio">${bio}</p></div><div class="profile-actions">${action}</div>${isSelf?`<form id="profile-details-form" class="profile-details-form"><label for="profile-status">Seu status <small>(até 60 caracteres)</small></label><input id="profile-status" name="status" maxlength="60" placeholder="Ex.: Jogando e conversando 🎮" value="${escapeHTML(person.status||'')}" /><label for="profile-bio">Sua bio <small>(até 280 caracteres)</small></label><textarea id="profile-bio" name="bio" maxlength="280" rows="3" placeholder="Conte um pouco sobre você…">${escapeHTML(person.bio||'')}</textarea><button class="primary-button" type="submit">Salvar bio e status</button></form><div class="profile-avatar-tools"><input id="profile-avatar-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden /><div id="profile-avatar-preview" class="image-preview hidden"></div><div class="profile-avatar-buttons"><button type="button" id="choose-avatar" class="outline-action">Escolher foto</button><button type="button" id="save-avatar" class="primary-button" disabled>Salvar foto</button><button type="button" id="remove-avatar" class="icon-btn text-button">Remover foto</button></div><p class="muted small">PNG, JPG, WEBP ou GIF, até 5 MB.</p></div>`:''}</div>`;
+    $('#profile-content').innerHTML=`<div class="profile-main">${avatarHtml(name,{large:true,imageId:person.avatarImageId})}<h3>@${escapeHTML(name)}</h3><div class="profile-info"><strong>Status</strong><p class="profile-status">${status}</p><strong>Sobre mim</strong><p class="profile-bio">${bio}</p></div><div class="profile-actions">${action}</div>${isSelf?`<form id="profile-details-form" class="profile-details-form"><label for="profile-status">Seu status <small>(até 60 caracteres)</small></label><input id="profile-status" name="status" maxlength="60" placeholder="Ex.: Jogando e conversando 🎮" value="${escapeHTML(person.status||'')}" /><label for="profile-bio">Sua bio <small>(até 280 caracteres)</small></label><textarea id="profile-bio" name="bio" maxlength="280" rows="3" placeholder="Conte um pouco sobre você…">${escapeHTML(person.bio||'')}</textarea><button class="primary-button" type="submit">Salvar bio e status</button></form><div class="profile-avatar-tools"><input id="profile-avatar-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden /><div id="profile-avatar-preview" class="image-preview hidden"></div><div class="profile-avatar-buttons"><button type="button" id="choose-avatar" class="outline-action">Escolher foto</button><button type="button" id="save-avatar" class="primary-button" disabled>Salvar foto</button><button type="button" id="remove-avatar" class="icon-btn text-button">Remover foto</button></div><p class="muted small">PNG, JPG, WEBP ou GIF, até 5 MB.</p></div>${emailSectionHTML()}`:''}</div>`;
   }catch(e){if(dialog.open)$('#profile-content').innerHTML=`<div class="profile-loading">${escapeHTML(e.message)}</div>`;}
 }
 async function saveProfileDetails(event){
@@ -296,7 +335,7 @@ async function saveProfileDetails(event){
   button.disabled=true;
   try{
     const data=await api('/api/profile/details',{method:'POST',data:{bio:form.querySelector('#profile-bio').value,status:form.querySelector('#profile-status').value}});
-    state.me=data.user;
+    state.me={...state.me,...data.user};
     toast('Bio e status atualizados!');
     await openProfile(state.me.id);
   }catch(e){toast(e.message,'error');button.disabled=false;}
@@ -434,7 +473,7 @@ async function saveProfileAvatar(){
   try{
     const upload=await api('/api/images',{method:'POST',file:state.profileAvatarFile});
     const data=await api('/api/profile/avatar',{method:'POST',data:{imageId:upload.imageId}});
-    state.me=data.user;
+    state.me={...state.me,...data.user};
     renderMyProfileChip();
     await Promise.allSettled([refreshFriends(),refreshRequests()]);
     renderMessages({scrollToBottom:false});
@@ -447,7 +486,7 @@ async function removeProfileAvatar(){
   const btn=$('#remove-avatar');btn.disabled=true;
   try{
     const data=await api('/api/profile/avatar',{method:'POST',data:{imageId:''}});
-    state.me=data.user;
+    state.me={...state.me,...data.user};
     renderMyProfileChip();
     await Promise.allSettled([refreshFriends(),refreshRequests()]);
     renderMessages({scrollToBottom:false});
@@ -493,6 +532,36 @@ function closeMobileSidebar(){$('#sidebar').classList.remove('open');$('#mobile-
 function wireEvents(){
   $('#tab-login').addEventListener('click',()=>selectAuthMode('login'));
   $('#tab-register').addEventListener('click',()=>selectAuthMode('register'));
+  $('#forgot-password').addEventListener('click',showRecovery);
+  $('#recovery-back').addEventListener('click',()=>selectAuthMode('login'));
+  $('#recovery-restart').addEventListener('click',()=>{
+    $('#recovery-confirm-form').classList.add('hidden');
+    $('#recovery-request-form').classList.remove('hidden');
+    $('#recovery-message').textContent='';
+  });
+  $('#recovery-request-form').addEventListener('submit',async e=>{
+    e.preventDefault();
+    const btn=e.target.querySelector('button[type=submit]');btn.disabled=true;
+    try{
+      const data=await api('/api/auth/forgot',{method:'POST',data:{email:$('#recovery-email').value.trim()}});
+      $('#recovery-request-form').classList.add('hidden');
+      $('#recovery-confirm-form').classList.remove('hidden');
+      $('#recovery-message').textContent=data.message;
+    }catch(err){$('#recovery-message').textContent=err.message;}finally{btn.disabled=false;}
+  });
+  $('#recovery-confirm-form').addEventListener('submit',async e=>{
+    e.preventDefault();
+    const btn=e.target.querySelector('button[type=submit]');btn.disabled=true;
+    try{
+      const data=await api('/api/auth/reset',{method:'POST',data:{
+        email:$('#recovery-email').value.trim(),code:$('#recovery-code').value.trim(),
+        password:$('#recovery-password').value
+      }});
+      selectAuthMode('login');
+      $('#auth-description').textContent=data.message;
+      toast(data.message);
+    }catch(err){$('#recovery-message').textContent=err.message;}finally{btn.disabled=false;}
+  });
   $('#toggle-password').addEventListener('click',()=>{
     const input=$('#auth-password');input.type=input.type==='password'?'text':'password';
     $('#toggle-password').setAttribute('aria-label',input.type==='password'?'Mostrar senha':'Ocultar senha');
@@ -502,9 +571,11 @@ function wireEvents(){
     const button=$('#auth-submit');button.disabled=true;
     try{
       const nickname=$('#auth-nick').value.trim();const password=$('#auth-password').value;
-      const d=await api(`/api/auth/${state.authMode==='register'?'register':'login'}`,{method:'POST',data:{nickname,password}});
+      const data={nickname,password};
+      if(state.authMode==='register')data.email=$('#auth-email').value.trim();
+      const d=await api(`/api/auth/${state.authMode==='register'?'register':'login'}`,{method:'POST',data});
       state.me=d.user;await initApp();
-      if(state.authMode==='register')toast('Conta criada! Bem-vindo(a) ao DDD.');
+      if(state.authMode==='register')toast(d.verificationSent?'Conta criada! Confira o e-mail e confirme seu código no perfil.':'Conta criada! Confirme seu e-mail no perfil quando o envio estiver disponível.');
     }catch(err){setAuthError(err.message);}finally{button.disabled=false;}
   });
   $('.profile-chip').addEventListener('click',e=>{ if(e.target.closest('#logout-btn')) return; openProfile(state.me.id); });
@@ -547,7 +618,31 @@ function wireEvents(){
   $('#close-image-viewer').addEventListener('click',closeImageViewer);
   $('#image-viewer').addEventListener('click',e=>{if(e.target===e.currentTarget)closeImageViewer();});
   $('#image-viewer').addEventListener('close',()=>$('#image-viewer-photo').removeAttribute('src'));
-  $('#profile-content').addEventListener('submit',e=>{if(e.target.id==='profile-details-form')saveProfileDetails(e);});
+  $('#profile-content').addEventListener('submit',async e=>{
+    if(e.target.id==='profile-details-form'){saveProfileDetails(e);return;}
+    if(e.target.id==='profile-email-request'){
+      e.preventDefault();
+      const btn=e.target.querySelector('button[type=submit]');btn.disabled=true;
+      try{
+        const data=await api('/api/auth/email/request',{method:'POST',data:{
+          email:$('#profile-email-address').value.trim(),password:$('#profile-email-password').value
+        }});
+        toast(data.message);
+        const me=await api('/api/me');state.me=me.user;
+        await openProfile(state.me.id);
+      }catch(err){toast(err.message,'error');btn.disabled=false;}
+      return;
+    }
+    if(e.target.id==='profile-email-confirm'){
+      e.preventDefault();
+      const btn=e.target.querySelector('button[type=submit]');btn.disabled=true;
+      try{
+        const data=await api('/api/auth/email/confirm',{method:'POST',data:{code:$('#profile-email-code').value.trim()}});
+        state.me=data.user;toast(data.message);
+        await openProfile(state.me.id);
+      }catch(err){toast(err.message,'error');btn.disabled=false;}
+    }
+  });
   $('#profile-content').addEventListener('click',e=>{
     const b=e.target.closest('[data-action]');if(b)friendAction(b.dataset.action,b.dataset.userId);
     if(e.target.closest('#choose-avatar')) $('#profile-avatar-input')?.click();
