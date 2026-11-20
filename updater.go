@@ -123,6 +123,10 @@ func manifestURL(repo string) string {
 	return "https://github.com/" + repo + "/releases/latest/download/ddd-update.json"
 }
 func verifiedManifest(m updateManifest) error {
+	return verifyManifestWithPublicKey(m, updatePublicKey)
+}
+
+func verifyManifestWithPublicKey(m updateManifest, keyBase64 string) error {
 	if _, err := parseVersion(m.Version); err != nil {
 		return err
 	}
@@ -137,7 +141,7 @@ func verifiedManifest(m updateManifest) error {
 	if err != nil || target.Scheme != "https" || target.Host != "github.com" || !strings.HasSuffix(strings.ToLower(target.Path), "/ddd.exe") {
 		return errors.New("endereço do arquivo não é um download HTTPS do GitHub")
 	}
-	pub, err := base64.StdEncoding.DecodeString(updatePublicKey)
+	pub, err := base64.StdEncoding.DecodeString(keyBase64)
 	if err != nil || len(pub) != ed25519.PublicKeySize {
 		return errors.New("chave pública inválida")
 	}
