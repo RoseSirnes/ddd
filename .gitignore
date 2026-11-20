@@ -1,0 +1,11 @@
+# Dados pessoais e chaves nunca devem entrar no repositório
+**/DDD-CHAVE-PRIVADA-ADMIN.txt
+**/chave-privada.txt
+**/ddd-data.json
+**/uploads/
+**/edge-profile/
+*.exe
+*.old
+*.backup
+.updates*
+__pycache__/

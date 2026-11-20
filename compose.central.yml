@@ -1,0 +1,14 @@
+services:
+  ddd:
+    build:
+      context: .
+      dockerfile: Dockerfile.central
+    restart: unless-stopped
+    environment:
+      PORT: 8080
+    ports:
+      - "127.0.0.1:8080:8080"
+    volumes:
+      - ddd_data:/data
+volumes:
+  ddd_data:

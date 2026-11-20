@@ -1,0 +1,31 @@
+DDD 1.1 - APLICATIVO PARA WINDOWS COM ATUALIZAÇÃO AUTOMÁTICA
+=============================================================
+
+PARA ABRIR
+1. Clique duas vezes em DDD.exe.
+2. O DDD abre uma janela própria (requer Microsoft Edge instalado).
+3. Crie sua conta ou entre normalmente.
+
+ATUALIZAÇÕES AUTOMÁTICAS
+- No menu do DDD, clique em "Atualizações".
+- Depois de criar e publicar versões num repositório GitHub, informe
+  o nome dele no formato usuario/repositorio e clique em Salvar.
+- Assim, nas próximas aberturas, o programa verifica novas versões,
+  confere a assinatura do arquivo e instala a atualização sozinho.
+- Para o sistema funcionar, é necessário publicar as versões no GitHub.
+  O app ainda não está ligado a um repositório real.
+- Só publicar o código não atualiza o app: você precisa publicar um
+  RELEASE com o executável e o arquivo de atualização assinado.
+
+DADOS
+- Suas contas, mensagens e imagens ficam salvas em %APPDATA%\DDD.
+- As atualizações NÃO apagam essa pasta.
+
+LIMITAÇÕES
+- A versão atual do DDD é local: os usuários em outros computadores
+  ainda não compartilham o chat até ser criado um servidor online.
+- Windows 10/11 64 bits, Edge instalado, permissão de gravar na pasta.
+- O DDD ainda não tem assinatura digital de publisher para o Windows.
+
+MAIS INSTRUÇÕES
+Abra o arquivo README.md que acompanha o código-fonte.

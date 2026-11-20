@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0b0d19" />
+  <meta name="description" content="DDD: seu espaço para conversar, conhecer pessoas e criar amizades." />
+  <title>DDD — Converse, compartilhe, conecte-se</title>
+  <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="/styles.css" />
+  <script type="module" src="/app.js"></script>
+</head>
+<body>
+  <div id="loading-screen" class="loading-screen">
+    <div class="brand-mark brand-mark--large" aria-hidden="true"><span></span></div>
+    <span>Entrando no DDD…</span>
+    <small>Verificando atualizações e preparando seu chat.</small>
+  </div>
+
+  <div id="blocking-update-screen" class="loading-screen hidden" aria-live="assertive">
+    <div class="brand-mark brand-mark--large" aria-hidden="true"><span></span></div>
+    <span>Atualizando o DDD…</span>
+    <small id="blocking-update-text">Durante essa etapa, ninguém pode usar o app.</small>
+    <div class="blocking-update-pill">Instalando <strong id="blocking-update-version">nova versão</strong></div>
+  </div>
+
+  <section id="auth-screen" class="auth-screen hidden" aria-label="Entrar ou criar conta">
+    <div class="auth-showcase">
+      <div class="auth-showcase__inner">
+        <a class="auth-logo" href="/"><span class="brand-mark" aria-hidden="true"><span></span></span><span>DDD<span class="brand-dot">.</span></span></a>
+        <div class="showcase-copy"><div class="eyebrow"><span class="sparkle">✦</span> SEU LUGAR NA INTERNET</div><h1>Gente nova.<br><em>Conexões reais.</em></h1><p>Entre na conversa, compartilhe momentos e encontre a sua galera. Um lugar inteiro para descobrir.</p></div>
+        <div class="space-art" aria-hidden="true">
+          <div class="space-art__glow"></div><div class="space-art__ring ring-one"></div><div class="space-art__ring ring-two"></div><div class="space-art__planet"><span>✳</span></div>
+          <div class="space-art__bubble bubble-one"><span class="emoji">✨</span> e aí, pessoal!</div>
+          <div class="space-art__bubble bubble-two"><span class="emoji">👋</span> alguém online?</div>
+          <div class="space-art__star star-one">✦</div><div class="space-art__star star-two">✧</div><div class="space-art__star star-three">✺</div>
+        </div>
+        <div class="showcase-footer"><span class="mini-online-dot"></span> Conecte-se. Converse. Faça parte.</div>
+      </div>
+    </div>
+    <div class="auth-content">
+      <div class="auth-box">
+        <div class="mobile-brand"><span class="brand-mark"><span></span></span> DDD<span class="brand-dot">.</span></div>
+        <div class="auth-kicker">BEM-VINDO(A) AO DDD</div>
+        <h2 id="auth-title">Bom ter você de volta <span class="waving">✳</span></h2>
+        <p id="auth-description" class="muted">Entre na sua conta e continue de onde parou.</p>
+        <div class="auth-tabs" role="tablist" aria-label="Acesso"><button class="auth-tab selected" id="tab-login" type="button" role="tab" aria-selected="true">Entrar</button><button class="auth-tab" id="tab-register" type="button" role="tab" aria-selected="false">Criar conta</button></div>
+        <form id="auth-form" autocomplete="on">
+          <label for="auth-nick">Seu nick</label>
+          <div class="input-wrap"><span class="input-prepend">@</span><input id="auth-nick" name="nickname" autocomplete="username" placeholder="seu_nick" minlength="3" maxlength="20" required pattern="[a-zA-Z0-9_.]{3,20}" /></div>
+          <label for="auth-password">Sua senha</label>
+          <div class="input-wrap"><svg class="input-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><rect x="4" y="10" width="16" height="11" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/></svg><input id="auth-password" name="password" type="password" autocomplete="current-password" placeholder="••••••••" minlength="8" maxlength="128" required /><button id="toggle-password" class="input-tail" type="button" aria-label="Mostrar senha" title="Mostrar senha">◉</button></div>
+          <p id="register-help" class="form-hint hidden">Nick: 3–20 caracteres, com letras, números, ponto ou _. Use uma senha de pelo menos 8 caracteres.</p>
+          <p id="auth-error" class="auth-error hidden" role="alert"></p>
+          <button id="auth-submit" class="primary-button auth-submit" type="submit">Entrar no DDD <span aria-hidden="true">↗</span></button>
+        </form>
+        <p class="auth-note">Sem e-mail nesta versão. Guarde sua senha: ainda não existe recuperação de acesso.</p>
+      </div>
+      <div class="auth-smallprint">Feito para boas conversas <span>✳</span> Versão 1.5</div>
+    </div>
+  </section>
+
+  <section id="app-screen" class="app-screen hidden" aria-label="DDD chat">
+    <div id="mobile-backdrop" class="mobile-backdrop hidden"></div>
+    <aside id="sidebar" class="sidebar">
+      <div class="sidebar-brand"><span class="brand-mark" aria-hidden="true"><span></span></span><span>DDD<span class="brand-dot">.</span></span><span class="sidebar-version">BETA</span></div>
+      <div class="sidebar-search"><span class="search-glyph">⌕</span><span>Encontre sua comunidade aqui</span><span class="keycap">✳</span></div>
+      <div class="sidebar-scroll">
+        <div class="side-section-label">EXPLORAR</div>
+        <button class="side-nav active" id="nav-global" data-nav="global" type="button"><span class="nav-symbol">#</span><span>Chat global</span><span class="side-nav-arrow">↗</span></button>
+        <button class="side-nav" id="nav-friends" data-nav="friends" type="button"><span class="nav-symbol">♧</span><span>Amizades</span><span id="requests-badge" class="nav-badge hidden">0</span></button>
+        <button class="side-nav" id="nav-updates" type="button"><span class="nav-symbol">↻</span><span>Atualizações</span><span class="side-nav-arrow">›</span></button>
+        <button class="side-nav" id="nav-server" type="button"><span class="nav-symbol">◎</span><span>Servidor do DDD</span><span id="server-mode-indicator" class="server-mode-indicator">LOCAL</span></button>
+        <div class="sidebar-section-heading"><span>CONVERSAS PRIVADAS</span><button type="button" id="find-friends-shortcut" class="round-add" title="Encontrar pessoas" aria-label="Encontrar pessoas">+</button></div>
+        <div id="friends-sidebar" class="friend-sidebar"><div class="placeholder-sidebar">Seus amigos aparecerão aqui ✨</div></div>
+      </div>
+      <div class="side-bottom">
+        <div class="community-card"><div class="community-card__stars">✦ &nbsp; ✳ &nbsp; ✧</div><strong>Seu espaço na comunidade.</strong><small>Converse com respeito e divirta-se!</small></div>
+        <div class="profile-chip"><div id="my-avatar" class="avatar avatar--medium"></div><div class="profile-chip__name"><strong id="my-nick">Seu nick</strong><small><span class="online-dot"></span> Online · clique para editar perfil</small></div><button id="logout-btn" class="icon-btn" type="button" title="Sair da conta" aria-label="Sair da conta"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M10 17l5-5-5-5m5 5H3M12 3h6a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-6"/></svg></button></div>
+      </div>
+    </aside>
+
+    <main class="main-area">
+      <div id="chat-view" class="view chat-view">
+        <header class="view-header"><button id="mobile-menu" class="icon-btn mobile-menu" type="button" aria-label="Abrir menu">☰</button><div id="chat-header-icon" class="channel-icon">#</div><div class="header-title"><h2 id="chat-title">chat-global</h2><p id="chat-subtitle">Um lugar para todo mundo se encontrar</p></div><div class="header-actions"><span class="live-pill"><span class="online-dot"></span> AO VIVO</span><button id="chat-info-btn" type="button" class="icon-btn header-info" title="Sobre este chat" aria-label="Sobre este chat">ⓘ</button></div></header>
+        <div id="chat-scroll" class="chat-scroll"><button type="button" id="load-more" class="load-more hidden">↑ Carregar mensagens anteriores</button><div id="chat-intro" class="chat-intro"><div class="chat-intro-icon">✳</div><div class="intro-overline">VOCÊ CHEGOU!</div><h3>É aqui que tudo começa.</h3><p>O chat global conecta todo mundo do DDD. Diga um oi e entre na conversa!</p></div><div id="message-list" class="message-list"></div></div>
+        <div class="composer-shell"><div id="image-preview" class="image-preview hidden"></div><form id="message-form" class="composer-form"><input id="file-input" type="file" accept="image/png,image/jpeg,image/webp,image/gif" hidden /><button id="attach-button" class="composer-attach" type="button" aria-label="Anexar imagem" title="Anexar imagem"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M20 12.5 11 21a6 6 0 0 1-8.5-8.5L12 3a4 4 0 0 1 5.7 5.7l-9.3 9.3a2 2 0 0 1-2.9-2.9l8-8"/></svg></button><textarea id="message-input" maxlength="2000" rows="1" placeholder="Mensagem para # chat-global" aria-label="Digite sua mensagem"></textarea><button id="send-button" class="send-button" type="submit" aria-label="Enviar mensagem"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m5 12 14-8-4 16-4-6-6-2zm6 2 8-10"/></svg></button></form><p class="composer-hint">Enter para enviar <span>·</span> Shift + Enter para quebrar linha <span>·</span> Imagens até 5 MB</p></div>
+      </div>
+
+      <div id="friends-view" class="view friends-view hidden"><header class="view-header"><button id="mobile-menu-friends" class="icon-btn mobile-menu" type="button" aria-label="Abrir menu">☰</button><div class="channel-icon friends-icon">♧</div><div class="header-title"><h2>Amizades</h2><p>Gente legal, bem pertinho de você</p></div></header><div class="friends-content"><div class="friends-hero"><div><span class="eyebrow">SEU CÍRCULO</span><h2>Conexões que <em>valem a pena.</em></h2><p>Conheça pessoas, envie convites e mantenha a conversa rolando.</p></div><div class="friends-hero-art" aria-hidden="true">☺ <span>✳</span></div></div><div class="friend-tabs"><button class="friend-tab selected" type="button" data-friend-tab="friends">Meus amigos</button><button class="friend-tab" type="button" data-friend-tab="requests">Pedidos <span id="tab-request-count"></span></button><button class="friend-tab" type="button" data-friend-tab="search">Encontrar pessoas</button></div><div id="friend-panel"></div></div></div>
+    </main>
+
+    <aside class="right-panel"><div class="right-block"><div class="right-label">NOSSA COMUNIDADE <span>✳</span></div><div class="right-feature"><div class="right-feature-orbit">✦</div><div><strong>Todo mundo é bem-vindo.</strong><p>Seja você mesmo e faça parte da conversa.</p></div></div></div><div class="right-block stat-block"><div class="right-label">COMUNIDADE</div><div class="stats-grid"><div><strong id="online-stat">0</strong><small><span class="online-dot"></span> online agora</small></div><div><strong id="member-stat">0</strong><small>membros</small></div></div></div><div class="right-block"><div class="right-label">AMIGOS ONLINE <span id="online-friends-qty" class="right-count">0</span></div><div id="online-friends" class="right-friends"><p class="muted small">Seus amigos online vão aparecer aqui.</p></div></div><div class="right-bottom"><div class="right-bottom-art">✧</div><strong>Boas conversas<br>fazem o mundo girar.</strong><p>Respeite as pessoas, não compartilhe informações sensíveis e divirta-se.</p></div></aside>
+  </section>
+  <div id="toast-region" class="toast-region" role="status" aria-live="polite"></div>
+  <dialog id="update-dialog" class="profile-dialog update-dialog" aria-label="Atualizações do DDD">
+    <button id="close-update" type="button" class="dialog-close" aria-label="Fechar">×</button>
+    <div class="update-icon">↻</div><h2>Atualizações automáticas</h2>
+    <p>O DDD pode baixar e instalar uma nova versão quando você abrir o aplicativo. Você não precisará baixar outro arquivo.</p>
+    <div class="update-current">Versão instalada: <strong id="update-installed">1.1.0</strong></div>
+    <form id="update-form">
+      <label for="update-repo">Repositório de atualizações no GitHub</label>
+      <input id="update-repo" name="repo" spellcheck="false" autocomplete="off" placeholder="seuusuario/ddd" required aria-describedby="update-help" />
+      <p class="update-help" id="update-help">Esta configuração só precisa ser feita uma vez, depois que o repositório for criado e tiver uma versão publicada.</p>
+      <button type="submit" class="primary-button">Salvar fonte de atualizações</button>
+    </form>
+    <div class="update-actions"><button id="check-update" type="button" class="outline-action">Verificar nova versão agora</button><button id="update-now" type="button" class="primary-button hidden">Atualizar agora</button></div>
+    <p id="update-status" role="status" class="update-status">Ainda não configurado.</p>
+  </dialog>
+  <dialog id="server-dialog" class="profile-dialog update-dialog" aria-label="Conexão ao servidor do DDD">
+    <button id="close-server" type="button" class="dialog-close" aria-label="Fechar">×</button>
+    <div class="update-icon">◎</div><h2>Servidor do DDD</h2>
+    <p>Para encontrar amigos que usam o DDD em outros computadores, todas as pessoas precisam estar conectadas ao <strong>mesmo servidor online</strong>.</p>
+    <div class="update-current" id="server-current-mode">Modo local</div>
+    <form id="server-form">
+      <label for="server-url">Endereço do servidor online</label>
+      <input id="server-url" class="ddd-server-input" type="url" spellcheck="false" autocomplete="off" placeholder="https://chat.seudominio.com" required />
+      <p class="update-help">Esse endereço só funcionará depois que o servidor central estiver publicado. Use apenas um endereço de servidor confiável. O GitHub de atualizações não é o servidor de chat.</p>
+      <button type="submit" class="primary-button">Conectar ao servidor online</button>
+    </form>
+    <button id="server-local-mode" type="button" class="outline-action">Usar contas deste computador</button>
+    <p class="update-status" id="server-settings-status" role="status">As contas do modo local continuam guardadas no seu PC.</p>
+  </dialog>
+  <dialog id="image-viewer" class="image-viewer" aria-label="Visualizar imagem no DDD">
+    <button id="close-image-viewer" class="image-viewer-close" type="button" aria-label="Fechar imagem">×</button>
+    <div class="image-viewer-content">
+      <img id="image-viewer-photo" alt="Imagem ampliada" />
+      <p id="image-viewer-caption"></p>
+    </div>
+  </dialog>
+  <dialog id="profile-dialog" class="profile-dialog"><button id="close-profile" type="button" class="dialog-close" aria-label="Fechar">×</button><div id="profile-content"></div></dialog>
+  <dialog id="info-dialog" class="profile-dialog info-dialog"><button id="close-info" type="button" class="dialog-close" aria-label="Fechar">×</button><div class="info-icon">✳</div><h2>O que é a DDD?</h2><p>Um chat comunitário em tempo real. O canal <strong>#chat-global</strong> é público para todos os membros cadastrados. As conversas privadas só funcionam entre amigos.</p><p>Cuide da sua privacidade: não compartilhe senhas, documentos ou informações pessoais. Esta é uma versão inicial, ainda sem ferramentas completas de moderação.</p></dialog>
+</body>
+</html>

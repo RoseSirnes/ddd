@@ -1,0 +1,66 @@
+name: Publicação automática do DDD
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: ddd-release
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+      - name: Testar
+        run: go test ./...
+      - name: Extrair versão e conferir configuração oficial
+        env:
+          DDD_SERVER_URL: ${{ vars.DDD_SERVER_URL }}
+          DDD_SIGNING_KEY: ${{ secrets.DDD_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          VERSION=$(sed -n 's/^const appVersion = "\([0-9]*\.[0-9]*\.[0-9]*\)"$/\1/p' updater.go)
+          test -n "$VERSION" || { echo 'appVersion inválido'; exit 1; }
+          test -n "$DDD_SIGNING_KEY" || { echo 'Configurar DDD_SIGNING_KEY em GitHub Secrets'; exit 1; }
+          if [[ ! "$DDD_SERVER_URL" =~ ^https://[a-zA-Z0-9.-]+$ ]]; then
+            echo 'Configurar DDD_SERVER_URL como domínio HTTPS público, sem barra final'; exit 1
+          fi
+          echo "DDD_VERSION=$VERSION" >> "$GITHUB_ENV"
+      - name: Verificar se versão já foi publicada
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "v${DDD_VERSION}" >/dev/null 2>&1; then
+            echo "DDD_ALREADY_RELEASED=yes" >> "$GITHUB_ENV"
+          fi
+      - name: Gerar DDD Windows com servidor e atualizador pré-configurados
+        if: env.DDD_ALREADY_RELEASED != 'yes'
+        env:
+          DDD_SERVER_URL: ${{ vars.DDD_SERVER_URL }}
+        run: |
+          GOOS=windows GOARCH=amd64 CGO_ENABLED=0 go build \
+            -ldflags="-H=windowsgui -s -w -X main.defaultCentralURL=${DDD_SERVER_URL} -X main.defaultUpdateRepo=${GITHUB_REPOSITORY}" \
+            -o DDD.exe .
+      - uses: actions/setup-python@v5
+        if: env.DDD_ALREADY_RELEASED != 'yes'
+        with:
+          python-version: '3.12'
+      - name: Preparar assinatura
+        if: env.DDD_ALREADY_RELEASED != 'yes'
+        run: python -m pip install cryptography
+      - name: Gerar manifesto assinado
+        if: env.DDD_ALREADY_RELEASED != 'yes'
+        env:
+          DDD_SIGNING_KEY: ${{ secrets.DDD_SIGNING_KEY }}
+        run: python tools/gerar_manifesto.py --version "$DDD_VERSION" --repo "$GITHUB_REPOSITORY" --exe DDD.exe
+      - name: Publicar automaticamente nova versão
+        if: env.DDD_ALREADY_RELEASED != 'yes'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "v${DDD_VERSION}" DDD.exe ddd-update.json --title "DDD ${DDD_VERSION}" --notes "Atualização automática do DDD."
