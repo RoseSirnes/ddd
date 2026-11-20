@@ -92,7 +92,7 @@ function showRecovery(){
   $('#recovery-panel').classList.remove('hidden');
   $('#recovery-message').textContent='';
   $('#auth-title').textContent='Recuperar minha conta';
-  $('#auth-description').textContent='Vamos enviar um código para o e-mail confirmado da sua conta.';
+  $('#auth-description').textContent='Vamos enviar um código para o e-mail cadastrado na sua conta.';
   $('#recovery-email').value=$('#auth-email').value || '';
   $('#recovery-request-form').classList.remove('hidden');
   $('#recovery-confirm-form').classList.add('hidden');
@@ -100,22 +100,15 @@ function showRecovery(){
 function emailSectionHTML(){
   const u=state.me||{};
   const current=u.email?escapeHTML(u.email):'Nenhum e-mail cadastrado';
-  const pending=u.pendingEmail?`<p class="mail-note">Verificação pendente para: ${escapeHTML(u.pendingEmail)}</p>`:'';
-  const status=u.emailVerified?'<span class="email-status verified">✓ Confirmado para recuperação</span>':'<span class="email-status unverified">⚠ Ainda não confirmado</span>';
-  return `<section class="profile-email-settings"><h4>✉ E-mail e recuperação de conta</h4><p class="mail-note">${current}</p>${u.email?status:''}${pending}
+  return `<section class="profile-email-settings"><h4>✉ E-mail de recuperação</h4><p class="mail-note">${current}</p>
     <form id="profile-email-request" class="profile-details-form">
-      <label for="profile-email-address">${u.email?'Alterar ou confirmar e-mail':'Adicionar e-mail de recuperação'}</label>
-      <input type="email" id="profile-email-address" placeholder="voce@exemplo.com" maxlength="254" value="${escapeHTML(u.pendingEmail||u.email||'')}" required />
+      <label for="profile-email-address">${u.email?'Alterar e-mail':'Adicionar e-mail de recuperação'}</label>
+      <input type="email" id="profile-email-address" placeholder="voce@exemplo.com" maxlength="254" value="${escapeHTML(u.email||'')}" required />
       <label for="profile-email-password">Senha atual (segurança)</label>
       <input type="password" id="profile-email-password" autocomplete="current-password" minlength="8" maxlength="128" required placeholder="Digite sua senha atual" />
-      <button class="primary-button" type="submit">Enviar código para o e-mail</button>
+      <button class="primary-button" type="submit">Salvar e-mail</button>
     </form>
-    <form id="profile-email-confirm" class="profile-details-form">
-      <label for="profile-email-code">Código recebido por e-mail</label>
-      <input id="profile-email-code" autocomplete="one-time-code" placeholder="XXXX-XXXX-XXXX-XXXX" required maxlength="19" minlength="16" />
-      <button class="primary-button" type="submit">Confirmar e-mail</button>
-    </form>
-    <p class="mail-note">Somente e-mails confirmados podem recuperar a senha. O e-mail não fica visível no seu perfil público.</p>
+    <p class="mail-note">Não precisa confirmar o e-mail. Se esquecer sua senha, enviaremos um código para esse endereço quando o envio estiver disponível. O e-mail não aparece no perfil público.</p>
   </section>`;
 }
 function setAuthError(text) {const err=$('#auth-error');err.textContent=text;err.classList.remove('hidden');}
@@ -575,7 +568,7 @@ function wireEvents(){
       if(state.authMode==='register')data.email=$('#auth-email').value.trim();
       const d=await api(`/api/auth/${state.authMode==='register'?'register':'login'}`,{method:'POST',data});
       state.me=d.user;await initApp();
-      if(state.authMode==='register')toast(d.verificationSent?'Conta criada! Confira o e-mail e confirme seu código no perfil.':'Conta criada! Confirme seu e-mail no perfil quando o envio estiver disponível.');
+      if(state.authMode==='register')toast('Conta criada! E-mail de recuperação cadastrado.');
     }catch(err){setAuthError(err.message);}finally{button.disabled=false;}
   });
   $('.profile-chip').addEventListener('click',e=>{ if(e.target.closest('#logout-btn')) return; openProfile(state.me.id); });
@@ -624,7 +617,7 @@ function wireEvents(){
       e.preventDefault();
       const btn=e.target.querySelector('button[type=submit]');btn.disabled=true;
       try{
-        const data=await api('/api/auth/email/request',{method:'POST',data:{
+        const data=await api('/api/auth/email/update',{method:'POST',data:{
           email:$('#profile-email-address').value.trim(),password:$('#profile-email-password').value
         }});
         toast(data.message);
@@ -633,15 +626,7 @@ function wireEvents(){
       }catch(err){toast(err.message,'error');btn.disabled=false;}
       return;
     }
-    if(e.target.id==='profile-email-confirm'){
-      e.preventDefault();
-      const btn=e.target.querySelector('button[type=submit]');btn.disabled=true;
-      try{
-        const data=await api('/api/auth/email/confirm',{method:'POST',data:{code:$('#profile-email-code').value.trim()}});
-        state.me=data.user;toast(data.message);
-        await openProfile(state.me.id);
-      }catch(err){toast(err.message,'error');btn.disabled=false;}
-    }
+
   });
   $('#profile-content').addEventListener('click',e=>{
     const b=e.target.closest('[data-action]');if(b)friendAction(b.dataset.action,b.dataset.userId);

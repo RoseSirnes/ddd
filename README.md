@@ -23,13 +23,12 @@ Compilação Windows (de produção requer URL e repo embutidos via flags de com
 
 Não distribua nem publique chaves privadas; ela **não pertence ao repositório**. O backend usa JSON e arquivos no disco; para teste com poucos usuários, requer volume e backups. A versão ainda não tem denúncia/bloqueio/moderação e não é apropriada para abertura irrestrita ao público. O domínio HTTPS do Railway, o segredo do GitHub Actions e a primeira release são etapas necessárias para a atualização automática funcionar.
 
-## E-mail e recuperação de conta (DDD 1.6)
+## E-mail e recuperação de conta (DDD 1.6.1)
 
-- Cada conta nova informa **nick, e-mail e senha**. O endereço de e-mail fica **privado**.
-- Um código de 16 caracteres é enviado para o e-mail informado. Em **Meu perfil → E-mail e recuperação**, o usuário confirma o código.
-- Pessoas com contas antigas podem adicionar seu e-mail pelo mesmo caminho, informando a senha atual.
-- **Esqueci minha senha:** solicita um código no e-mail **confirmado** e permite escolher uma senha nova. O código expira após 15 minutos, tem limite de tentativas e invalida sessões anteriores depois de utilizado.
-- A confirmação de e-mail expira após 30 minutos. Um endereço pendente não é aceito para redefinir senhas. A verificação ou alteração do e-mail exige a senha atual, mesmo com a conta já conectada.
+- No cadastro, o usuário informa **nick, e-mail e senha**. O endereço é privado e **não há etapa separada de confirmação do e-mail**.
+- Em **Meu perfil → E-mail de recuperação**, usuários antigos podem adicionar ou alterar o endereço informando sua senha atual, sem receber código de verificação.
+- **Esqueci minha senha:** exige um código enviado ao endereço cadastrado, com expiração em 15 minutos, limite de tentativas, uso único e invalidação das sessões anteriores.
+- Sem um provedor de envio configurado no servidor, cadastro e alteração de e-mail continuam funcionando, mas **a recuperação por e-mail permanece indisponível**.
 
 ### Ativar envio de e-mail no Railway (uma única vez)
 
@@ -38,6 +37,6 @@ Para enviar os códigos a usuários reais, use [Resend](https://resend.com). O d
 - `RESEND_API_KEY`: chave de API, mantida como segredo do Railway; **não** a coloque no GitHub, no código nem no chat.
 - `DDD_FROM_EMAIL`: um remetente do domínio verificado, como `DDD <contas@seudominio.com>`.
 
-A implantação automática do Railway reiniciará o servidor com essas variáveis. O endpoint `GET /api/auth/email/status` informa se o envio está configurado. Sem as variáveis, a criação de contas continua funcionando, mas a confirmação e a recuperação por e-mail permanecem indisponíveis. **Não anuncie recuperação ativa até verificar uma entrega real de e-mail.**
+A implantação automática do Railway reiniciará o servidor com essas variáveis. O endpoint `GET /api/auth/email/status` informa se o envio está configurado. Sem as variáveis, a criação de contas continua funcionando, mas a recuperação por e-mail permanece indisponível. **Não anuncie recuperação ativa até verificar uma entrega real de e-mail.**
 
 Os e-mails são enviados pelo servidor central ao endpoint HTTPS do Resend (`POST /emails`), nunca diretamente pelo executável Windows. Códigos são armazenados somente como hashes, expiram, são de uso único e têm limites de tentativas.

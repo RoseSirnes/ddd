@@ -35,7 +35,7 @@ func emailCodeFromBody(t *testing.T, body string) string {
 	return m
 }
 
-func TestEmailRegistrationVerificationAndReset(t *testing.T) {
+func TestEmailRegistrationWithoutVerificationAndReset(t *testing.T) {
 	app, err := newApp(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -59,20 +59,9 @@ func TestEmailRegistrationVerificationAndReset(t *testing.T) {
 		t.Fatal("cookie de sessão ausente")
 	}
 	cookie := cookies[0]
-	if !strings.Contains(registered.Body.String(), `"verificationSent":true`) {
-		t.Fatalf("não notificou envio: %s", registered.Body.String())
-	}
-	if len(mailBodies) != 1 {
-		t.Fatal("e-mail de confirmação não enviado")
-	}
-	code := emailCodeFromBody(t, mailBodies[0])
-	wrong := authJSON(t, app, "/api/auth/email/confirm", map[string]string{"code": "0123-4567-89AB-CDEF"}, cookie)
-	if wrong.Code == http.StatusOK {
-		t.Fatal("aceitou código errado")
-	}
-	verify := authJSON(t, app, "/api/auth/email/confirm", map[string]string{"code": code}, cookie)
-	if verify.Code != http.StatusOK || !strings.Contains(verify.Body.String(), `"emailVerified":true`) {
-		t.Fatalf("verificação %d %s", verify.Code, verify.Body.String())
+	if len(mailBodies) != 0 { t.Fatal("cadastro não deve enviar e-mail de confirmação") }
+	if strings.Contains(registered.Body.String(), "\"emailVerified\"") {
+		t.Fatal("cadastro ainda oferece confirmação de e-mail")
 	}
 	// Public profile must never include account email address.
 	var userID string
@@ -92,10 +81,10 @@ func TestEmailRegistrationVerificationAndReset(t *testing.T) {
 	if forgot.Code != 200 || unknown.Body.String() != forgot.Body.String() {
 		t.Fatalf("enumeração de conta: unknown %s / known %s", unknown.Body.String(), forgot.Body.String())
 	}
-	if len(mailBodies) != 2 {
+	if len(mailBodies) != 1 {
 		t.Fatal("e-mail de recuperação não enviado")
 	}
-	resetCode := emailCodeFromBody(t, mailBodies[1])
+	resetCode := emailCodeFromBody(t, mailBodies[0])
 	invalid := authJSON(t, app, "/api/auth/reset", map[string]string{
 		"email": "pessoa@example.com", "code": "0000000000000000", "password": "novaSenha-2026!",
 	}, nil)
@@ -132,19 +121,15 @@ func TestEmailRegistrationVerificationAndReset(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, u := range persisted.db.Users {
-		if u.Email != "pessoa@example.com" || !u.EmailVerified {
+		if u.Email != "pessoa@example.com" {
 			t.Fatal("e-mail não persistido")
 		}
 	}
 }
 
-func TestExistingAccountCanAttachVerifiedEmailAndPreventDuplicates(t *testing.T) {
+func TestExistingAccountCanAttachEmailWithoutVerificationAndPreventDuplicates(t *testing.T) {
 	app, _ := newApp(t.TempDir())
-	var gotMail string
-	app.emailSender = func(ctx context.Context, to, subject, body string) error {
-		gotMail = body
-		return nil
-	}
+	app.emailSender = nil
 	app.mu.Lock()
 	id := uid()
 	app.db.Users[id] = User{ID: id, Nickname: "LegacyUser", PasswordHash: hashPassword("oldpassword123"), CreatedAt: now()}
@@ -166,9 +151,8 @@ func TestExistingAccountCanAttachVerifiedEmailAndPreventDuplicates(t *testing.T)
 	if resp.Code != 200 {
 		t.Fatalf("legacy email request %d %s", resp.Code, resp.Body.String())
 	}
-	confirm := authJSON(t, app, "/api/auth/email/confirm", map[string]string{"code": emailCodeFromBody(t, gotMail)}, cookie)
-	if confirm.Code != 200 {
-		t.Fatalf("legacy confirm %d %s", confirm.Code, confirm.Body.String())
+	if !strings.Contains(resp.Body.String(), "\"email\":\"legacy@example.com\"") {
+		t.Fatalf("e-mail não salvo: %s", resp.Body.String())
 	}
 	duplicate := authJSON(t, app, "/api/auth/register", map[string]string{
 		"nickname": "AnotherUser", "email": "LEGACY@example.com", "password": "passAnother2026!",
@@ -193,8 +177,6 @@ func TestRecoveryDisabledWhenMailerAbsentAndCodeExpires(t *testing.T) {
 	}
 	app.mu.Lock()
 	for id, u := range app.db.Users {
-		u.EmailVerified = true
-		app.db.Users[id] = u
 		app.db.EmailChallenges[challengeKey(id, "reset")] = EmailChallenge{
 			UserID: id, Email: u.Email, Purpose: "reset",
 			Hash: codeHash(id, "reset", "0123456789ABCDEF"), ExpiresAt: time.Now().Add(-time.Minute).UnixMilli(),

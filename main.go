@@ -35,8 +35,6 @@ type User struct {
 	Nickname      string `json:"nickname"`
 	PasswordHash  string `json:"passwordHash"`
 	Email         string `json:"email,omitempty"`
-	EmailVerified bool   `json:"emailVerified"`
-	PendingEmail  string `json:"pendingEmail,omitempty"`
 	AvatarImageID string `json:"avatarImageId"`
 	Bio           string `json:"bio"`
 	Status        string `json:"status"`
@@ -462,23 +460,9 @@ func (a *App) routes(w http.ResponseWriter, r *http.Request) {
 			apiErr(w, 500, "Não foi possível salvar a conta.")
 			return
 		}
-		// A conta pode ser criada mesmo enquanto o provedor de e-mail é configurado.
-		// A recuperação só funcionará após confirmação do endereço.
-		code, canSend := "", a.emailSender != nil
-		if canSend {
-			code = a.issueChallengeLocked(u.ID, u.Email, "verify")
-			if err := a.save(); err != nil {
-				delete(a.db.EmailChallenges, challengeKey(u.ID, "verify"))
-				canSend = false
-			}
-		}
 		a.mu.Unlock()
-		verificationSent := canSend && a.sendSecurityEmail(r.Context(), u.Email, "verify", code) == nil
-		if canSend && !verificationSent {
-			a.dropChallenge(u.ID, "verify", code)
-		}
 		setCookie(w, token, 30*86400, a.publicServer)
-		jsonRes(w, 201, map[string]any{"user": privateUser(u), "verificationSent": verificationSent})
+		jsonRes(w, 201, map[string]any{"user": privateUser(u)})
 		return
 	}
 	if p == "/api/auth/login" && r.Method == "POST" {

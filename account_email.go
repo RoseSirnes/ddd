@@ -56,7 +56,7 @@ func codeHash(userID, purpose, code string) string {
 
 func (a *App) emailInUseLocked(email, exceptUserID string) bool {
 	for _, other := range a.db.Users {
-		if other.ID != exceptUserID && (other.Email == email || other.PendingEmail == email) {
+		if other.ID != exceptUserID && other.Email == email {
 			return true
 		}
 	}
@@ -67,16 +67,13 @@ func privateUser(u User) map[string]any {
 	return map[string]any{
 		"id": u.ID, "nickname": u.Nickname, "avatarImageId": nullStr(u.AvatarImageID),
 		"bio": u.Bio, "status": u.Status, "createdAt": u.CreatedAt,
-		"email": u.Email, "emailVerified": u.EmailVerified, "pendingEmail": u.PendingEmail,
+		"email": u.Email,
 	}
 }
 
 func (a *App) issueChallengeLocked(userID, email, purpose string) string {
 	code := strings.ToUpper(randHex(8))
 	expires := 15 * time.Minute
-	if purpose == "verify" {
-		expires = 30 * time.Minute
-	}
 	a.db.EmailChallenges[challengeKey(userID, purpose)] = EmailChallenge{
 		UserID: userID, Email: email, Purpose: purpose,
 		Hash:      codeHash(userID, purpose, code),
@@ -143,11 +140,8 @@ func (a *App) sendSecurityEmail(ctx context.Context, to, purpose, code string) e
 		return errors.New("envio de e-mail indisponível")
 	}
 	pretty := code[:4] + "-" + code[4:8] + "-" + code[8:12] + "-" + code[12:]
-	subject, body := "DDD — confirmar seu e-mail", "Seu código para confirmar o e-mail do DDD é: "+pretty+"\n\nO código vale por 30 minutos.\nSe você não pediu isso, pode ignorar esta mensagem."
-	if purpose == "reset" {
-		subject = "DDD — recuperar sua conta"
-		body = "Seu código para redefinir a senha do DDD é: " + pretty + "\n\nO código vale por 15 minutos. Não compartilhe este código com ninguém.\nSe você não pediu a recuperação, ignore este e-mail."
-	}
+	subject := "DDD — recuperar sua conta"
+	body := "Seu código para redefinir a senha do DDD é: " + pretty + "\\n\\nO código vale por 15 minutos. Não compartilhe este código com ninguém.\\nSe você não pediu a recuperação, ignore este e-mail."
 	return a.emailSender(ctx, to, subject, body)
 }
 
@@ -182,7 +176,7 @@ func (a *App) handlePublicEmailRoutes(w http.ResponseWriter, r *http.Request) bo
 		}
 		var user User
 		for _, v := range a.db.Users {
-			if v.EmailVerified && v.Email == email {
+			if v.Email == email {
 				user = v
 				break
 			}
@@ -204,7 +198,7 @@ func (a *App) handlePublicEmailRoutes(w http.ResponseWriter, r *http.Request) bo
 			}
 		}
 		// Do not disclose whether an account is associated with this address.
-		jsonRes(w, 200, map[string]any{"message": "Se esse e-mail estiver confirmado no DDD, você receberá um código para recuperar a senha."})
+		jsonRes(w, 200, map[string]any{"message": "Se esse e-mail estiver cadastrado no DDD, você receberá um código para recuperar a senha."})
 		return true
 	case r.URL.Path == "/api/auth/reset" && r.Method == http.MethodPost:
 		a.mu.Lock()
@@ -238,7 +232,7 @@ func (a *App) handlePublicEmailRoutes(w http.ResponseWriter, r *http.Request) bo
 		defer a.mu.Unlock()
 		var user User
 		for _, v := range a.db.Users {
-			if v.EmailVerified && v.Email == email {
+			if v.Email == email {
 				user = v
 				break
 			}
@@ -288,132 +282,50 @@ func (a *App) handlePublicEmailRoutes(w http.ResponseWriter, r *http.Request) bo
 	return false
 }
 
+// O e-mail é salvo imediatamente após confirmar a senha atual.
+// A recuperação continua exigindo um código enviado ao endereço cadastrado.
 func (a *App) handleAccountEmailRoutes(w http.ResponseWriter, r *http.Request, auth User) bool {
-	switch {
-	case r.URL.Path == "/api/auth/email/request" && r.Method == http.MethodPost:
-		var req struct {
-			Email    string `json:"email"`
-			Password string `json:"password"`
-		}
-		if !readJSON(w, r, &req) {
-			return true
-		}
-		email, err := normalizedEmail(req.Email)
-		if err != nil {
-			apiErr(w, 400, "Informe um e-mail válido.")
-			return true
-		}
-		if a.emailSender == nil {
-			apiErr(w, 503, "A verificação por e-mail ainda não está disponível. O administrador precisa configurar o envio.")
-			return true
-		}
-		// Re-authentication makes stolen sessions insufficient to add an attacker's address.
-		if !checkPassword(req.Password, auth.PasswordHash) {
-			apiErr(w, 401, "Informe sua senha atual para confirmar o endereço.")
-			return true
-		}
-		a.mu.Lock()
-		user, exists := a.db.Users[auth.ID]
-		if !exists || user.PasswordHash != auth.PasswordHash {
-			a.mu.Unlock()
-			apiErr(w, 401, "Entre novamente na sua conta.")
-			return true
-		}
-		if user.Email == email && user.EmailVerified {
-			a.mu.Unlock()
-			apiErr(w, 400, "Esse e-mail já está confirmado.")
-			return true
-		}
-		if a.emailInUseLocked(email, auth.ID) {
-			a.mu.Unlock()
-			apiErr(w, 409, "Esse e-mail já está em uso.")
-			return true
-		}
-		if !a.limit("verify:user:"+auth.ID, 5, time.Hour) ||
-			!a.limit("verify:email:"+sha(email), 5, time.Hour) {
-			a.mu.Unlock()
-			apiErr(w, 429, "Muitas tentativas. Aguarde antes de pedir outro código.")
-			return true
-		}
-		oldPending := user.PendingEmail
-		if user.Email != email {
-			user.PendingEmail = email
-		} else {
-			user.PendingEmail = ""
-		}
-		a.db.Users[user.ID] = user
-		code := a.issueChallengeLocked(user.ID, email, "verify")
-		if err := a.save(); err != nil {
-			user.PendingEmail = oldPending
-			a.db.Users[user.ID] = user
-			delete(a.db.EmailChallenges, challengeKey(user.ID, "verify"))
-			a.mu.Unlock()
-			apiErr(w, 500, "Não foi possível preparar o e-mail.")
-			return true
-		}
-		a.mu.Unlock()
-		if err := a.sendSecurityEmail(r.Context(), email, "verify", code); err != nil {
-			a.dropChallenge(user.ID, "verify", code)
-			apiErr(w, 502, "Não foi possível enviar o código agora. Tente novamente.")
-			return true
-		}
-		jsonRes(w, 200, map[string]any{"message": "Código enviado! Confira o e-mail e digite o código de confirmação."})
-		return true
-	case r.URL.Path == "/api/auth/email/confirm" && r.Method == http.MethodPost:
-		var req struct {
-			Code string `json:"code"`
-		}
-		if !readJSON(w, r, &req) {
-			return true
-		}
-		code := cleanCode(req.Code)
-		if !codePattern.MatchString(code) {
-			apiErr(w, 400, "Código inválido. Confira o e-mail.")
-			return true
-		}
-		a.mu.Lock()
-		defer a.mu.Unlock()
-		if !a.limit("confirm:user:"+auth.ID, 12, time.Hour) {
-			apiErr(w, 429, "Muitas tentativas. Tente mais tarde.")
-			return true
-		}
-		user, exists := a.db.Users[auth.ID]
-		key := challengeKey(auth.ID, "verify")
-		challenge, pending := a.db.EmailChallenges[key]
-		valid := exists && pending && challenge.ExpiresAt >= now() && challenge.Attempts < 5 &&
-			(challenge.Email == user.Email || challenge.Email == user.PendingEmail) &&
-			hmac.Equal([]byte(challenge.Hash), []byte(codeHash(auth.ID, "verify", code)))
-		if !valid {
-			if pending {
-				challenge.Attempts++
-				if challenge.Attempts >= 5 {
-					delete(a.db.EmailChallenges, key)
-				} else {
-					a.db.EmailChallenges[key] = challenge
-				}
-				_ = a.save()
-			}
-			apiErr(w, 400, "Código inválido ou expirado. Peça outro código.")
-			return true
-		}
-		if a.emailInUseLocked(challenge.Email, user.ID) {
-			apiErr(w, 409, "Esse e-mail já está cadastrado.")
-			return true
-		}
-		oldUser := user
-		user.Email = challenge.Email
-		user.EmailVerified = true
-		user.PendingEmail = ""
-		a.db.Users[user.ID] = user
-		delete(a.db.EmailChallenges, key)
-		if err := a.save(); err != nil {
-			a.db.Users[user.ID] = oldUser
-			a.db.EmailChallenges[key] = challenge
-			apiErr(w, 500, "Não foi possível confirmar o e-mail.")
-			return true
-		}
-		jsonRes(w, 200, map[string]any{"message": "E-mail confirmado! Sua conta já pode ser recuperada.", "user": privateUser(user)})
+	if (r.URL.Path != "/api/auth/email/update" && r.URL.Path != "/api/auth/email/request") || r.Method != http.MethodPost {
+		return false
+	}
+	var req struct {
+		Email string `json:"email"`
+		Password string `json:"password"`
+	}
+	if !readJSON(w, r, &req) { return true }
+	email, err := normalizedEmail(req.Email)
+	if err != nil { apiErr(w,400,"Informe um e-mail válido."); return true }
+	if !checkPassword(req.Password,auth.PasswordHash) {
+		apiErr(w,401,"Informe sua senha atual para alterar o e-mail."); return true
+	}
+	a.mu.Lock()
+	defer a.mu.Unlock()
+	user, exists := a.db.Users[auth.ID]
+	if !exists || user.PasswordHash != auth.PasswordHash {
+		apiErr(w,401,"Entre novamente na sua conta."); return true
+	}
+	if a.emailInUseLocked(email,user.ID) {
+		apiErr(w,409,"Esse e-mail já está cadastrado."); return true
+	}
+	if user.Email == email {
+		jsonRes(w,200,map[string]any{"message":"Esse já é seu e-mail de recuperação.","user":privateUser(user)})
 		return true
 	}
-	return false
+	if !a.limit("update:email:"+user.ID,8,time.Hour) {
+		apiErr(w,429,"Muitas alterações de e-mail. Tente mais tarde."); return true
+	}
+	old := user
+	oldChallenge, hadChallenge := a.db.EmailChallenges[challengeKey(user.ID,"reset")]
+	user.Email = email
+	a.db.Users[user.ID] = user
+	delete(a.db.EmailChallenges,challengeKey(user.ID,"reset"))
+	delete(a.db.EmailChallenges,challengeKey(user.ID,"verify"))
+	if err := a.save(); err != nil {
+		a.db.Users[user.ID] = old
+		if hadChallenge { a.db.EmailChallenges[challengeKey(user.ID,"reset")] = oldChallenge }
+		apiErr(w,500,"Não foi possível salvar o novo e-mail.")
+		return true
+	}
+	jsonRes(w,200,map[string]any{"message":"E-mail de recuperação salvo!","user":privateUser(user)})
+	return true
 }
