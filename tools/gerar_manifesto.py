@@ -48,13 +48,7 @@ def main() -> None:
         parser.error('Defina DDD_SIGNING_KEY ou informe --key-file')
     # Impede publicar um executável assinado com chave que o aplicativo não reconhece.
     source = args.public_key_file.read_text(encoding='utf-8')
-    match = re.search(r'^const updatePublicKey = "([^"]+)"    args.output.write_text(json.dumps(manifest, indent=2, ensure_ascii=False) + '\n', encoding='utf-8')
-    print(f'Manifesto assinado: {args.output} (versão {manifest["version"]})')
-
-
-if __name__ == '__main__':
-    main()
-, source, re.MULTILINE)
+    match = re.search(r'^const updatePublicKey = "([^"]+)"$', source, re.MULTILINE)
     if not match:
         parser.error('Não foi possível ler a chave pública do aplicativo')
     private_obj = Ed25519PrivateKey.from_private_bytes(base64.b64decode(private.strip(), validate=True))
